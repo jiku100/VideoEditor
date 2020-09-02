@@ -7,6 +7,10 @@ from PyQt5.QtGui import *
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        if glob.glob("./Capture/*.jpg"):
+            self.start_capture_num = int(sorted(glob.glob("./Capture/*.jpg"))[-1][17:-4]) + 1
+        else:
+            self.start_capture_num = 0
         self.setUi()
 
     def setUi(self):
@@ -20,28 +24,49 @@ class MainWindow(QMainWindow):
         self.video = QLabel()
         self.video.resize(1600, 900)
         self.video.setScaledContents(True)
-        self.btn = QPushButton("selasd")
-        self.btn.resize(self.sizeHint())
+
+        self.btn = QPushButton("프레임 캡처")
+        self.btn.clicked.connect(self.captureFrame)
 
         self.mainVBox.addWidget(self.video)
         self.mainVBox.addWidget(self.btn)
         self.setCentralWidget(self.mainWidget)
         # Test code
-        self.cap = cv2.VideoCapture("Test-video.mp4")
-
+        self.cap = cv2.VideoCapture("./test/Test-video.mp4")
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.timer = QTimer()
         self.timer.timeout.connect(self.nextFrameSlot)
-        self.timer.start(1000. / self.cap.get(cv2.CAP_PROP_FPS))
+        self.timer.start(1000. / self.fps)
 
+        QShortcut(QKeySequence(Qt.Key_Right), self.video, activated=self.frame_right)    # frame 오른쪽 이동 정의
+        QShortcut(QKeySequence(Qt.Key_Left), self.video, activated=self.frame_left)      # frame 왼쪽 이동
 
     def nextFrameSlot(self):
-        _, frame = self.cap.read()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+        _, self.frame = self.cap.read()
+        self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+        img = QImage(self.frame, self.frame.shape[1], self.frame.shape[0], QImage.Format_RGB888)
         pix = QPixmap.fromImage(img)
         self.video.setPixmap(pix)
 
+    def keyPressEvent(self, e):
+        pass
 
+    def frame_right(self):
+        curr_frame = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+        target_frame = curr_frame + 5 * self.fps if curr_frame + 5 * self.fps < self.cap.get(
+            cv2.CAP_PROP_FRAME_COUNT) else self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+
+    def frame_left(self):
+        curr_frame = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+        target_frame = curr_frame - 5 * self.fps if curr_frame - 5 * self.fps > 0 else 0
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+
+    def captureFrame(self):
+        output_name = "./Capture/capture" + str(self.start_capture_num) + ".jpg"
+        self.frame = cv2.cvtColor(self.frame, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(output_name, self.frame)
+        self.start_capture_num += 1
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
